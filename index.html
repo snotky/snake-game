@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>乘法貪食蛇</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #1a1a2e;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      font-family: 'Segoe UI', sans-serif;
+      color: #eee;
+    }
+
+    h1 {
+      font-size: 2rem;
+      margin-bottom: 0.5rem;
+      color: #4ecca3;
+      text-shadow: 0 0 20px #4ecca355;
+      letter-spacing: 0.1em;
+    }
+
+    #question-box {
+      font-size: 2.2rem;
+      font-weight: bold;
+      margin-bottom: 0.6rem;
+      min-height: 2.8rem;
+      color: #fff;
+      letter-spacing: 0.05em;
+    }
+
+    #question-box span { color: #f9ca24; }
+
+    #scoreboard {
+      display: flex;
+      gap: 2.5rem;
+      margin-bottom: 0.8rem;
+      font-size: 1rem;
+    }
+
+    .score-item span {
+      color: #4ecca3;
+      font-size: 1.4rem;
+      font-weight: bold;
+    }
+
+    #canvas-wrapper { position: relative; }
+
+    canvas {
+      border: 2px solid #4ecca3;
+      border-radius: 4px;
+      box-shadow: 0 0 30px #4ecca333;
+      display: block;
+    }
+
+    #overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: rgba(26, 26, 46, 0.9);
+      border-radius: 4px;
+      gap: 0.8rem;
+    }
+
+    #overlay h2 { font-size: 2rem; color: #4ecca3; }
+
+    #overlay p {
+      color: #aaa;
+      font-size: 1rem;
+      text-align: center;
+      line-height: 1.6;
+    }
+
+    #start-btn {
+      margin-top: 0.5rem;
+      padding: 0.7rem 2.5rem;
+      font-size: 1.1rem;
+      background: #4ecca3;
+      color: #1a1a2e;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: background 0.2s, transform 0.1s;
+    }
+
+    #start-btn:hover { background: #38b892; transform: scale(1.05); }
+    #start-btn:active { transform: scale(0.97); }
+
+    #level-select { display: flex; gap: 0.5rem; }
+
+    .lvl-btn {
+      padding: 0.35rem 1rem;
+      border: 1px solid #444;
+      background: transparent;
+      color: #aaa;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: all 0.15s;
+    }
+
+    .lvl-btn:hover, .lvl-btn.active {
+      border-color: #4ecca3;
+      color: #4ecca3;
+    }
+
+    #controls {
+      margin-top: 0.8rem;
+      color: #555;
+      font-size: 0.82rem;
+      text-align: center;
+      line-height: 1.7;
+    }
+
+    #feedback {
+      font-size: 1rem;
+      min-height: 1.4rem;
+      margin-bottom: 0.3rem;
+      font-weight: bold;
+    }
+
+    /* Kill announcement banner */
+    #kill-banner {
+      position: absolute;
+      left: 50%;
+      top: 38%;
+      transform: translate(-50%, -50%) scale(0.5);
+      opacity: 0;
+      pointer-events: none;
+      text-align: center;
+      transition: none;
+      z-index: 10;
+    }
+
+    #kill-banner.show {
+      animation: killPop 1.6s ease-out forwards;
+    }
+
+    #kill-banner .kill-label {
+      font-size: 2.6rem;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      filter: drop-shadow(0 0 12px currentColor);
+      white-space: nowrap;
+    }
+
+    #kill-banner .kill-sub {
+      font-size: 0.9rem;
+      letter-spacing: 0.2em;
+      opacity: 0.8;
+      margin-top: -4px;
+    }
+
+    @keyframes killPop {
+      0%   { transform: translate(-50%, -50%) scale(0.4); opacity: 0; }
+      15%  { transform: translate(-50%, -50%) scale(1.15); opacity: 1; }
+      30%  { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+      70%  { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+      100% { transform: translate(-50%, -50%) scale(1.05); opacity: 0; }
+    }
+  </style>
+</head>
+<body>
+  <h1>乘法貪食蛇</h1>
+
+  <div id="question-box">準備開始...</div>
+  <div id="feedback"></div>
+
+  <div id="scoreboard">
+    <div class="score-item">分數：<span id="score">0</span></div>
+    <div class="score-item">最高分：<span id="best">0</span></div>
+    <div class="score-item">連對：<span id="combo">0</span></div>
+  </div>
+
+  <div id="canvas-wrapper">
+    <canvas id="game" width="500" height="500"></canvas>
+
+    <!-- Kill streak banner -->
+    <div id="kill-banner">
+      <div class="kill-label" id="kill-label-text"></div>
+      <div class="kill-sub" id="kill-sub-text"></div>
+    </div>
+
+    <div id="overlay">
+      <h2 id="overlay-title">乘法貪食蛇</h2>
+      <p id="overlay-msg">看題目，找到正確答案吃掉它！<br>吃錯答案就遊戲結束。</p>
+      <div id="level-select">
+        <button class="lvl-btn active" data-speed="200">慢</button>
+        <button class="lvl-btn" data-speed="130">中</button>
+        <button class="lvl-btn" data-speed="80">快</button>
+        <button class="lvl-btn" data-speed="50">極速</button>
+      </div>
+      <button id="start-btn">開始遊戲</button>
+    </div>
+  </div>
+
+  <div id="controls">
+    方向鍵 / WASD 控制方向 ｜ 空白鍵 暫停 ｜ Enter 確定
+  </div>
+
+  <script>
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    const overlay = document.getElementById('overlay');
+    const overlayTitle = document.getElementById('overlay-title');
+    const overlayMsg = document.getElementById('overlay-msg');
+    const startBtn = document.getElementById('start-btn');
+    const scoreEl = document.getElementById('score');
+    const bestEl = document.getElementById('best');
+    const comboEl = document.getElementById('combo');
+    const questionBox = document.getElementById('question-box');
+    const feedbackEl = document.getElementById('feedback');
+    const killBanner = document.getElementById('kill-banner');
+    const killLabelText = document.getElementById('kill-label-text');
+    const killSubText = document.getElementById('kill-sub-text');
+
+    const COLS = 20, ROWS = 20;
+    const CELL = canvas.width / COLS;
+    const NUM_WRONG = 4;
+
+    let snake, dir, nextDir, score, best, gameLoop, speed, paused, running;
+    let currentQ, answers, combo, feedbackTimer, firstBloodDone, killBannerTimer;
+
+    best = parseInt(localStorage.getItem('math_snake_best') || '0');
+    bestEl.textContent = best;
+    speed = 200;
+
+    // ── Audio Engine ──────────────────────────────────────────────
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+    function playTone(freq, type, duration, gainVal = 0.4, delay = 0) {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, audioCtx.currentTime + delay);
+      gain.gain.setValueAtTime(gainVal, audioCtx.currentTime + delay);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + delay + duration);
+      osc.start(audioCtx.currentTime + delay);
+      osc.stop(audioCtx.currentTime + delay + duration);
+    }
+
+    function playFirstBloodSound() {
+      // Dramatic low → high rising
+      playTone(220, 'sawtooth', 0.15, 0.5, 0);
+      playTone(330, 'sawtooth', 0.15, 0.5, 0.12);
+      playTone(440, 'sawtooth', 0.2,  0.6, 0.24);
+      playTone(660, 'square',   0.4,  0.5, 0.36);
+    }
+
+    function playDoubleKillSound() {
+      playTone(440, 'square', 0.12, 0.4, 0);
+      playTone(550, 'square', 0.12, 0.4, 0.13);
+      playTone(660, 'square', 0.25, 0.5, 0.26);
+    }
+
+    function playTripleKillSound() {
+      playTone(440, 'sawtooth', 0.1,  0.4, 0);
+      playTone(550, 'sawtooth', 0.1,  0.4, 0.1);
+      playTone(660, 'sawtooth', 0.1,  0.4, 0.2);
+      playTone(880, 'square',   0.3,  0.6, 0.3);
+    }
+
+    function playQuadraKillSound() {
+      [0, 0.09, 0.18, 0.27].forEach((d, i) => {
+        playTone(440 + i * 110, 'sawtooth', 0.1, 0.4, d);
+      });
+      playTone(1100, 'square', 0.4, 0.7, 0.38);
+    }
+
+    function playPentaKillSound() {
+      [0, 0.08, 0.16, 0.24, 0.32].forEach((d, i) => {
+        playTone(330 + i * 110, 'sawtooth', 0.1, 0.45, d);
+      });
+      playTone(1320, 'square', 0.5, 0.8, 0.42);
+    }
+
+    function playGodlikeSound() {
+      // Epic ascending chord burst
+      [262, 330, 392, 523, 659, 784].forEach((f, i) => {
+        playTone(f, 'sawtooth', 0.6, 0.35, i * 0.07);
+      });
+      playTone(1047, 'square', 0.8, 0.6, 0.45);
+    }
+
+    function playKillSound(type) {
+      try {
+        audioCtx.resume();
+        ({ firstblood: playFirstBloodSound, double: playDoubleKillSound,
+           triple: playTripleKillSound,    quadra: playQuadraKillSound,
+           penta:  playPentaKillSound,     godlike: playGodlikeSound }
+        )[type]?.();
+      } catch(e) {}
+    }
+
+    // ── Speech ────────────────────────────────────────────────────
+    function speak(text) {
+      if (!window.speechSynthesis) return;
+      speechSynthesis.cancel();
+      const utt = new SpeechSynthesisUtterance(text);
+      utt.lang = 'en-US';
+      utt.rate = 0.9;
+      utt.pitch = 1.1;
+      utt.volume = 1;
+      speechSynthesis.speak(utt);
+    }
+
+    // ── Kill Streak Config ────────────────────────────────────────
+    const STREAKS = [
+      // { minCombo, label, sub, color, sound, points }
+      { minCombo: 1,  label: 'First Blood!',  sub: 'FIRST KILL',    color: '#e74c3c', sound: 'firstblood', points: 10 },
+      { minCombo: 2,  label: 'Double Kill!',  sub: 'DOUBLE KILL',   color: '#e67e22', sound: 'double',     points: 20 },
+      { minCombo: 3,  label: 'Triple Kill!',  sub: 'TRIPLE KILL',   color: '#f1c40f', sound: 'triple',     points: 30 },
+      { minCombo: 4,  label: 'Quadra Kill!',  sub: 'QUADRA KILL',   color: '#2ecc71', sound: 'quadra',     points: 40 },
+      { minCombo: 5,  label: 'Penta Kill!',   sub: 'PENTA KILL',    color: '#3498db', sound: 'penta',      points: 50 },
+      { minCombo: 6,  label: 'Godlike!',      sub: 'LEGENDARY',     color: '#9b59b6', sound: 'godlike',    points: 60 },
+    ];
+
+    function getStreak(combo, isFirst) {
+      if (isFirst && combo === 1) return STREAKS[0];
+      if (!isFirst && combo === 1) return null; // normal kill, no streak
+      return [...STREAKS].reverse().find(s => combo >= s.minCombo && s.minCombo > 1) || null;
+    }
+
+    function showKillBanner(label, sub, color) {
+      clearTimeout(killBannerTimer);
+      killBanner.classList.remove('show');
+      // Force reflow
+      void killBanner.offsetWidth;
+      killLabelText.textContent = label;
+      killSubText.textContent = sub;
+      killLabelText.style.color = color;
+      killSubText.style.color = color;
+      killBanner.classList.add('show');
+      killBannerTimer = setTimeout(() => killBanner.classList.remove('show'), 1600);
+    }
+
+    // ── Level buttons ─────────────────────────────────────────────
+    document.querySelectorAll('.lvl-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.lvl-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        speed = parseInt(btn.dataset.speed);
+      });
+    });
+
+    // ── Helpers ───────────────────────────────────────────────────
+    function randInt(min, max) {
+      return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    function shuffleArray(arr) {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+    }
+
+    function newQuestion() {
+      const a = randInt(1, 9), b = randInt(1, 9);
+      const ans = a * b;
+      currentQ = { a, b, ans };
+
+      const wrongSet = new Set();
+      while (wrongSet.size < NUM_WRONG) {
+        const w = randInt(1, 9) * randInt(1, 9);
+        if (w !== ans) wrongSet.add(w);
+      }
+
+      const allAnswers = [{ val: ans, correct: true }]
+        .concat([...wrongSet].map(v => ({ val: v, correct: false })));
+      shuffleArray(allAnswers);
+
+      const occupied = new Set(snake.map(s => `${s.x},${s.y}`));
+      answers = allAnswers.map(a => {
+        let pos;
+        do { pos = { x: randInt(0, COLS - 1), y: randInt(0, ROWS - 1) }; }
+        while (occupied.has(`${pos.x},${pos.y}`));
+        occupied.add(`${pos.x},${pos.y}`);
+        return { ...pos, val: a.val, correct: a.correct };
+      });
+
+      questionBox.innerHTML =
+        `<span>${currentQ.a}</span> × <span>${currentQ.b}</span> = <span style="color:#4ecca3">?</span>`;
+    }
+
+    function initGame() {
+      const midX = Math.floor(COLS / 2), midY = Math.floor(ROWS / 2);
+      snake = [
+        { x: midX, y: midY },
+        { x: midX - 1, y: midY },
+        { x: midX - 2, y: midY },
+      ];
+      dir = { x: 1, y: 0 };
+      nextDir = { x: 1, y: 0 };
+      score = 0; combo = 0;
+      firstBloodDone = false;
+      paused = false; running = true;
+      feedbackEl.textContent = '';
+      updateUI();
+      newQuestion();
+    }
+
+    function updateUI() {
+      scoreEl.textContent = score;
+      comboEl.textContent = combo;
+      if (score > best) {
+        best = score;
+        bestEl.textContent = best;
+        localStorage.setItem('math_snake_best', best);
+      }
+    }
+
+    function showFeedback(text, color) {
+      feedbackEl.textContent = text;
+      feedbackEl.style.color = color;
+      clearTimeout(feedbackTimer);
+      feedbackTimer = setTimeout(() => feedbackEl.textContent = '', 1400);
+    }
+
+    // ── Game Loop ─────────────────────────────────────────────────
+    function step() {
+      if (paused || !running) return;
+
+      dir = nextDir;
+      const head = { x: snake[0].x + dir.x, y: snake[0].y + dir.y };
+
+      if (head.x < 0 || head.x >= COLS || head.y < 0 || head.y >= ROWS)
+        return gameOver('撞牆了！');
+      if (snake.some(s => s.x === head.x && s.y === head.y))
+        return gameOver('咬到自己了！');
+
+      snake.unshift(head);
+
+      const hitIdx = answers.findIndex(a => a.x === head.x && a.y === head.y);
+      let grew = false;
+
+      if (hitIdx !== -1) {
+        const hit = answers[hitIdx];
+        if (hit.correct) {
+          const isFirst = !firstBloodDone;
+          firstBloodDone = true;
+          combo++;
+
+          // Determine streak
+          const streak = getStreak(combo, isFirst);
+
+          // Base points
+          let gained = 10;
+          if (streak) gained = streak.points;
+
+          score += gained;
+          grew = true;
+
+          if (streak) {
+            showKillBanner(streak.label, streak.sub, streak.color);
+            playKillSound(streak.sound);
+            speak(streak.label);
+            showFeedback(`${streak.label}  +${gained}`, streak.color);
+          } else {
+            showFeedback(`正確！ +${gained}`, '#4ecca3');
+          }
+
+          updateUI();
+          newQuestion();
+        } else {
+          return gameOver(`吃錯了！正確答案是 ${currentQ.ans}`);
+        }
+      }
+
+      if (!grew) snake.pop();
+      draw();
+    }
+
+    // ── Draw ──────────────────────────────────────────────────────
+    function draw() {
+      ctx.fillStyle = '#16213e';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Grid
+      ctx.strokeStyle = '#1e2d50';
+      ctx.lineWidth = 0.5;
+      for (let i = 0; i <= COLS; i++) {
+        ctx.beginPath(); ctx.moveTo(i * CELL, 0); ctx.lineTo(i * CELL, canvas.height); ctx.stroke();
+      }
+      for (let j = 0; j <= ROWS; j++) {
+        ctx.beginPath(); ctx.moveTo(0, j * CELL); ctx.lineTo(canvas.width, j * CELL); ctx.stroke();
+      }
+
+      // Answer tiles
+      if (answers) {
+        answers.forEach(a => {
+          const x = a.x * CELL, y = a.y * CELL;
+          ctx.fillStyle = '#0f3460';
+          ctx.beginPath();
+          ctx.roundRect(x + 2, y + 2, CELL - 4, CELL - 4, 5);
+          ctx.fill();
+          ctx.strokeStyle = a.correct ? '#4ecca344' : '#2a4a7f';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.roundRect(x + 2, y + 2, CELL - 4, CELL - 4, 5);
+          ctx.stroke();
+          ctx.fillStyle = '#e0e0e0';
+          ctx.font = `bold ${CELL * 0.42}px Segoe UI`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(a.val, x + CELL / 2, y + CELL / 2);
+        });
+      }
+
+      // Snake
+      snake.forEach((seg, i) => {
+        const alpha = 1 - (i / snake.length) * 0.5;
+        ctx.fillStyle = i === 0
+          ? `rgba(78, 204, 163, ${alpha})`
+          : `rgba(56, 184, 146, ${alpha * 0.85})`;
+        const pad = i === 0 ? 1 : 2;
+        ctx.beginPath();
+        ctx.roundRect(seg.x * CELL + pad, seg.y * CELL + pad, CELL - pad * 2, CELL - pad * 2, 4);
+        ctx.fill();
+      });
+
+      // Eyes
+      const head = snake[0];
+      const ex = head.x * CELL + CELL / 2, ey = head.y * CELL + CELL / 2;
+      const perpX = dir.y, perpY = -dir.x;
+      ctx.fillStyle = '#1a1a2e';
+      ctx.beginPath();
+      ctx.arc(ex + dir.x * 4 + perpX * 4, ey + dir.y * 4 + perpY * 4, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(ex + dir.x * 4 - perpX * 4, ey + dir.y * 4 - perpY * 4, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function gameOver(reason) {
+      running = false;
+      clearInterval(gameLoop);
+      overlayTitle.textContent = '遊戲結束！';
+      overlayMsg.innerHTML = `${reason}<br>得分：${score}　連對：${combo}`;
+      startBtn.textContent = '再玩一次';
+      startBtn.style.display = '';
+      document.querySelectorAll('.lvl-btn').forEach(b => b.style.display = '');
+      overlay.style.display = 'flex';
+      questionBox.innerHTML = '準備開始...';
+      draw();
+    }
+
+    // ── Controls ──────────────────────────────────────────────────
+    startBtn.addEventListener('click', () => {
+      audioCtx.resume();
+      overlay.style.display = 'none';
+      clearInterval(gameLoop);
+      initGame();
+      draw();
+      gameLoop = setInterval(step, speed);
+    });
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && overlay.style.display !== 'none' && startBtn.style.display !== 'none') {
+        startBtn.click(); return;
+      }
+      switch (e.key) {
+        case 'ArrowUp':    case 'w': case 'W':
+          if (dir.y !== 1)  nextDir = { x: 0, y: -1 }; break;
+        case 'ArrowDown':  case 's': case 'S':
+          if (dir.y !== -1) nextDir = { x: 0, y: 1  }; break;
+        case 'ArrowLeft':  case 'a': case 'A':
+          if (dir.x !== 1)  nextDir = { x: -1, y: 0 }; break;
+        case 'ArrowRight': case 'd': case 'D':
+          if (dir.x !== -1) nextDir = { x: 1,  y: 0 }; break;
+        case ' ':
+          if (!running) return;
+          e.preventDefault();
+          paused = !paused;
+          if (paused) {
+            overlayTitle.textContent = '暫停';
+            overlayMsg.textContent = '按空白鍵繼續';
+            startBtn.style.display = 'none';
+            document.querySelectorAll('.lvl-btn').forEach(b => b.style.display = 'none');
+            overlay.style.display = 'flex';
+          } else {
+            overlay.style.display = 'none';
+            startBtn.style.display = '';
+            document.querySelectorAll('.lvl-btn').forEach(b => b.style.display = '');
+          }
+          break;
+        case 'r': case 'R':
+          if (!running) return;
+          clearInterval(gameLoop);
+          overlay.style.display = 'none';
+          initGame(); draw();
+          gameLoop = setInterval(step, speed);
+          break;
+      }
+      if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) e.preventDefault();
+    });
+
+    // Initial draw
+    ctx.fillStyle = '#16213e';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  </script>
+</body>
+</html>

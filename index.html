@@ -66,9 +66,10 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      background: rgba(26, 26, 46, 0.9);
+      background: rgba(26, 26, 46, 0.93);
       border-radius: 4px;
-      gap: 0.8rem;
+      gap: 0.7rem;
+      padding: 1rem;
     }
 
     #overlay h2 { font-size: 2rem; color: #4ecca3; }
@@ -81,7 +82,7 @@
     }
 
     #start-btn {
-      margin-top: 0.5rem;
+      margin-top: 0.3rem;
       padding: 0.7rem 2.5rem;
       font-size: 1.1rem;
       background: #4ecca3;
@@ -169,6 +170,77 @@
       70%  { transform: translate(-50%, -50%) scale(1); opacity: 1; }
       100% { transform: translate(-50%, -50%) scale(1.05); opacity: 0; }
     }
+
+    /* Name input */
+    #name-section { display: flex; flex-direction: column; align-items: center; gap: 0.6rem; }
+
+    #name-input {
+      padding: 0.5rem 1rem;
+      font-size: 1.1rem;
+      border-radius: 6px;
+      border: 2px solid #4ecca3;
+      background: #0f3460;
+      color: #fff;
+      text-align: center;
+      outline: none;
+      width: 200px;
+    }
+
+    #name-input::placeholder { color: #556; }
+
+    #confirm-name-btn {
+      padding: 0.5rem 2rem;
+      font-size: 1rem;
+      background: #4ecca3;
+      color: #1a1a2e;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: background 0.2s, transform 0.1s;
+    }
+
+    #confirm-name-btn:hover { background: #38b892; transform: scale(1.05); }
+
+    /* Leaderboard */
+    #leaderboard {
+      width: 100%;
+      max-width: 300px;
+    }
+
+    #leaderboard h3 {
+      color: #f9ca24;
+      font-size: 0.95rem;
+      text-align: center;
+      margin-bottom: 0.4rem;
+      letter-spacing: 0.1em;
+    }
+
+    .lb-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.88rem;
+    }
+
+    .lb-row:nth-child(even) { background: rgba(255,255,255,0.04); }
+
+    .lb-rank { color: #555; width: 1.4rem; }
+    .lb-rank.gold   { color: #f9ca24; font-weight: bold; }
+    .lb-rank.silver { color: #bbb;    font-weight: bold; }
+    .lb-rank.bronze { color: #cd7f32; font-weight: bold; }
+
+    .lb-name  { flex: 1; color: #ccc; padding: 0 0.4rem; }
+    .lb-score { color: #4ecca3; font-weight: bold; }
+
+    .lb-empty { color: #444; font-size: 0.85rem; text-align: center; padding: 0.3rem 0; }
+
+    #player-label {
+      font-size: 0.85rem;
+      color: #4ecca3;
+    }
   </style>
 </head>
 <body>
@@ -193,15 +265,31 @@
     </div>
 
     <div id="overlay">
-      <h2 id="overlay-title">乘法貪食蛇</h2>
-      <p id="overlay-msg">看題目，找到正確答案吃掉它！<br>吃錯答案就遊戲結束。</p>
-      <div id="level-select">
-        <button class="lvl-btn active" data-speed="200">慢</button>
-        <button class="lvl-btn" data-speed="130">中</button>
-        <button class="lvl-btn" data-speed="80">快</button>
-        <button class="lvl-btn" data-speed="50">極速</button>
+      <!-- Name input (shown first) -->
+      <div id="name-section">
+        <h2>乘法貪食蛇</h2>
+        <p>請輸入你的名字</p>
+        <input id="name-input" type="text" maxlength="10" placeholder="玩家名稱" autocomplete="off">
+        <button id="confirm-name-btn">確認</button>
       </div>
-      <button id="start-btn">開始遊戲</button>
+
+      <!-- Game start / game over (hidden initially) -->
+      <div id="game-section" style="display:none; flex-direction:column; align-items:center; gap:0.7rem; width:100%;">
+        <h2 id="overlay-title">乘法貪食蛇</h2>
+        <p id="overlay-msg">看題目，找到正確答案吃掉它！<br>吃錯答案就遊戲結束。</p>
+        <div id="leaderboard">
+          <h3>🏆 排行榜</h3>
+          <div id="lb-list"></div>
+        </div>
+        <div id="level-select">
+          <button class="lvl-btn active" data-speed="200">慢</button>
+          <button class="lvl-btn" data-speed="130">中</button>
+          <button class="lvl-btn" data-speed="80">快</button>
+          <button class="lvl-btn" data-speed="50">極速</button>
+        </div>
+        <div id="player-label"></div>
+        <button id="start-btn">開始遊戲</button>
+      </div>
     </div>
   </div>
 
@@ -224,6 +312,13 @@
     const killBanner = document.getElementById('kill-banner');
     const killLabelText = document.getElementById('kill-label-text');
     const killSubText = document.getElementById('kill-sub-text');
+    const nameSection = document.getElementById('name-section');
+    const gameSection = document.getElementById('game-section');
+    const nameInput = document.getElementById('name-input');
+    const confirmNameBtn = document.getElementById('confirm-name-btn');
+    const playerLabel = document.getElementById('player-label');
+    const lbList = document.getElementById('lb-list');
+    const levelSelect = document.getElementById('level-select');
 
     const COLS = 20, ROWS = 20;
     const CELL = canvas.width / COLS;
@@ -231,10 +326,56 @@
 
     let snake, dir, nextDir, score, best, gameLoop, speed, paused, running;
     let currentQ, answers, combo, feedbackTimer, firstBloodDone, killBannerTimer;
+    let playerName = '';
 
     best = parseInt(localStorage.getItem('math_snake_best') || '0');
     bestEl.textContent = best;
     speed = 200;
+
+    // ── Leaderboard ───────────────────────────────────────────────
+    function loadLeaderboard() {
+      try { return JSON.parse(localStorage.getItem('math_snake_lb') || '[]'); }
+      catch { return []; }
+    }
+
+    function saveScore(name, sc) {
+      if (sc <= 0) return;
+      const lb = loadLeaderboard();
+      lb.push({ name, score: sc });
+      lb.sort((a, b) => b.score - a.score);
+      lb.splice(5);
+      localStorage.setItem('math_snake_lb', JSON.stringify(lb));
+    }
+
+    function renderLeaderboard() {
+      const lb = loadLeaderboard();
+      const medals = ['gold', 'silver', 'bronze'];
+      if (lb.length === 0) {
+        lbList.innerHTML = '<div class="lb-empty">還沒有紀錄，快來挑戰！</div>';
+        return;
+      }
+      lbList.innerHTML = lb.map((entry, i) => `
+        <div class="lb-row">
+          <span class="lb-rank ${medals[i] || ''}">${['🥇','🥈','🥉'][i] || (i + 1)}</span>
+          <span class="lb-name">${entry.name}</span>
+          <span class="lb-score">${entry.score}</span>
+        </div>
+      `).join('');
+    }
+
+    // ── Name confirm ──────────────────────────────────────────────
+    function confirmName() {
+      const val = nameInput.value.trim();
+      if (!val) { nameInput.focus(); return; }
+      playerName = val;
+      nameSection.style.display = 'none';
+      gameSection.style.display = 'flex';
+      playerLabel.textContent = `玩家：${playerName}`;
+      renderLeaderboard();
+    }
+
+    confirmNameBtn.addEventListener('click', confirmName);
+    nameInput.addEventListener('keydown', e => { if (e.key === 'Enter') confirmName(); });
 
     // ── Audio Engine ──────────────────────────────────────────────
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -253,7 +394,6 @@
     }
 
     function playFirstBloodSound() {
-      // Dramatic low → high rising
       playTone(220, 'sawtooth', 0.15, 0.5, 0);
       playTone(330, 'sawtooth', 0.15, 0.5, 0.12);
       playTone(440, 'sawtooth', 0.2,  0.6, 0.24);
@@ -288,7 +428,6 @@
     }
 
     function playGodlikeSound() {
-      // Epic ascending chord burst
       [262, 330, 392, 523, 659, 784].forEach((f, i) => {
         playTone(f, 'sawtooth', 0.6, 0.35, i * 0.07);
       });
@@ -319,7 +458,6 @@
 
     // ── Kill Streak Config ────────────────────────────────────────
     const STREAKS = [
-      // { minCombo, label, sub, color, sound, points }
       { minCombo: 1,  label: 'First Blood!',  sub: 'FIRST KILL',    color: '#e74c3c', sound: 'firstblood', points: 10 },
       { minCombo: 2,  label: 'Double Kill!',  sub: 'DOUBLE KILL',   color: '#e67e22', sound: 'double',     points: 20 },
       { minCombo: 3,  label: 'Triple Kill!',  sub: 'TRIPLE KILL',   color: '#f1c40f', sound: 'triple',     points: 30 },
@@ -330,14 +468,13 @@
 
     function getStreak(combo, isFirst) {
       if (isFirst && combo === 1) return STREAKS[0];
-      if (!isFirst && combo === 1) return null; // normal kill, no streak
+      if (!isFirst && combo === 1) return null;
       return [...STREAKS].reverse().find(s => combo >= s.minCombo && s.minCombo > 1) || null;
     }
 
     function showKillBanner(label, sub, color) {
       clearTimeout(killBannerTimer);
       killBanner.classList.remove('show');
-      // Force reflow
       void killBanner.offsetWidth;
       killLabelText.textContent = label;
       killSubText.textContent = sub;
@@ -454,10 +591,7 @@
           firstBloodDone = true;
           combo++;
 
-          // Determine streak
           const streak = getStreak(combo, isFirst);
-
-          // Base points
           let gained = 10;
           if (streak) gained = streak.points;
 
@@ -548,11 +682,15 @@
     function gameOver(reason) {
       running = false;
       clearInterval(gameLoop);
+      saveScore(playerName, score);
       overlayTitle.textContent = '遊戲結束！';
       overlayMsg.innerHTML = `${reason}<br>得分：${score}　連對：${combo}`;
+      renderLeaderboard();
       startBtn.textContent = '再玩一次';
       startBtn.style.display = '';
-      document.querySelectorAll('.lvl-btn').forEach(b => b.style.display = '');
+      levelSelect.style.display = '';
+      playerLabel.textContent = `玩家：${playerName}`;
+      gameSection.style.display = 'flex';
       overlay.style.display = 'flex';
       questionBox.innerHTML = '準備開始...';
       draw();
@@ -569,8 +707,11 @@
     });
 
     document.addEventListener('keydown', e => {
-      if (e.key === 'Enter' && overlay.style.display !== 'none' && startBtn.style.display !== 'none') {
-        startBtn.click(); return;
+      if (e.key === 'Enter') {
+        if (nameSection.style.display !== 'none') { confirmName(); return; }
+        if (overlay.style.display !== 'none' && startBtn.style.display !== 'none') {
+          startBtn.click(); return;
+        }
       }
       switch (e.key) {
         case 'ArrowUp':    case 'w': case 'W':
@@ -589,12 +730,16 @@
             overlayTitle.textContent = '暫停';
             overlayMsg.textContent = '按空白鍵繼續';
             startBtn.style.display = 'none';
-            document.querySelectorAll('.lvl-btn').forEach(b => b.style.display = 'none');
+            levelSelect.style.display = 'none';
+            lbList.innerHTML = '';
+            document.getElementById('leaderboard').querySelector('h3').style.display = 'none';
+            gameSection.style.display = 'flex';
             overlay.style.display = 'flex';
           } else {
             overlay.style.display = 'none';
             startBtn.style.display = '';
-            document.querySelectorAll('.lvl-btn').forEach(b => b.style.display = '');
+            levelSelect.style.display = '';
+            document.getElementById('leaderboard').querySelector('h3').style.display = '';
           }
           break;
         case 'r': case 'R':
